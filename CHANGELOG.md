@@ -2,6 +2,11 @@
 
 All notable changes to Flashback will be documented in this file.
 
+## [0.2.1] - 2025-01-08
+
+### Added
+- `/flashback:version` command to check current and latest version
+
 ## [0.2.0] - 2025-01-08
 
 ### Added
