@@ -4,14 +4,28 @@
 # Renders old context as images and shows available visual memory
 #
 
+# Get the directory where this script lives
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PLUGIN_DIR="$(dirname "$SCRIPT_DIR")"
+
 # Configuration
 STORE_DIR="${FLASHBACK_STORE_DIR:-$HOME/.flashback}"
 TURNS_THRESHOLD="${FLASHBACK_TURNS_THRESHOLD:-5}"
 MAX_IMAGES="${FLASHBACK_MAX_IMAGES:-3}"
+AUTO_UPDATE="${FLASHBACK_AUTO_UPDATE:-true}"
 
 # Colors
 CYAN='\033[0;36m'
+YELLOW='\033[0;33m'
+GREEN='\033[0;32m'
 NC='\033[0m' # No Color
+
+# Get local version from plugin.json
+LOCAL_VERSION=$(node -e "
+const fs = require('fs');
+const p = JSON.parse(fs.readFileSync('$PLUGIN_DIR/.claude-plugin/plugin.json', 'utf8'));
+console.log(p.version || '0.0.0');
+" 2>/dev/null)
 
 # Read JSON from stdin to temp file (avoids shell escaping issues)
 TEMP_INPUT=$(mktemp)
@@ -32,6 +46,49 @@ fi
 
 SESSION_DIR="$STORE_DIR/$SESSION_ID"
 
+# Create session dir if it doesn't exist (for version check file)
+mkdir -p "$SESSION_DIR"
+
+# Version check - only once per session
+VERSION_CHECK_FILE="$SESSION_DIR/.version_checked"
+if [ ! -f "$VERSION_CHECK_FILE" ]; then
+  touch "$VERSION_CHECK_FILE"
+
+  # Fetch latest version from GitHub (with 2s timeout)
+  REMOTE_VERSION=$(curl -s --max-time 2 \
+    "https://raw.githubusercontent.com/markjrobby/flashback/main/.claude-plugin/plugin.json" 2>/dev/null | \
+    node -e "
+let data = '';
+process.stdin.on('data', chunk => data += chunk);
+process.stdin.on('end', () => {
+  try {
+    const p = JSON.parse(data);
+    console.log(p.version || '');
+  } catch(e) {
+    console.log('');
+  }
+});
+" 2>/dev/null)
+
+  if [ -n "$REMOTE_VERSION" ] && [ "$REMOTE_VERSION" != "$LOCAL_VERSION" ]; then
+    # Compare versions (simple string compare works for semver)
+    if [ "$(printf '%s\n' "$REMOTE_VERSION" "$LOCAL_VERSION" | sort -V | tail -n1)" = "$REMOTE_VERSION" ] && [ "$REMOTE_VERSION" != "$LOCAL_VERSION" ]; then
+      if [ "$AUTO_UPDATE" = "true" ]; then
+        # Auto-update: pull latest
+        cd "$PLUGIN_DIR" && git pull --quiet origin main 2>/dev/null
+        if [ $? -eq 0 ]; then
+          echo -e "${GREEN}[flashback] Updated to v$REMOTE_VERSION${NC}"
+        else
+          echo -e "${YELLOW}[flashback v$LOCAL_VERSION] Update available: v$REMOTE_VERSION - run /flashback:update${NC}"
+        fi
+      else
+        echo -e "${YELLOW}[flashback v$LOCAL_VERSION] Update available: v$REMOTE_VERSION - run /flashback:update${NC}"
+      fi
+    fi
+  fi
+fi
+
+# Check if we have any captured entries
 if [ ! -d "$SESSION_DIR" ]; then
   exit 0
 fi
@@ -145,7 +202,7 @@ done
 
 # Always show available flashback images in cyan
 if [ ${#AVAILABLE[@]} -gt 0 ]; then
-  echo -e "${CYAN}[flashback] Visual memory from earlier:${NC}"
+  echo -e "${CYAN}[flashback v$LOCAL_VERSION] Visual memory from earlier:${NC}"
   for ITEM in "${AVAILABLE[@]}"; do
     IFS=$'\t' read -r HINT TURNS_AGO IMG_FILE <<< "$ITEM"
     echo -e "${CYAN}  $HINT ($TURNS_AGO turns ago): $IMG_FILE${NC}"

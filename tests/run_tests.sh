@@ -109,7 +109,7 @@ echo ""
 echo "Test 4: Inject renders PNG and shows notification"
 INJECT_OUTPUT=$(echo "{\"session_id\":\"$TEST_SESSION\"}" | bash "$PROJECT_DIR/scripts/inject.sh" 2>&1)
 
-if echo "$INJECT_OUTPUT" | grep -q "\[flashback\]"; then
+if echo "$INJECT_OUTPUT" | grep -q "\[flashback"; then
   pass "Inject shows notification"
 else
   fail "Inject did not show notification"
@@ -127,7 +127,7 @@ echo ""
 echo "Test 5: Inject shows existing PNGs on re-run"
 INJECT_OUTPUT2=$(echo "{\"session_id\":\"$TEST_SESSION\"}" | bash "$PROJECT_DIR/scripts/inject.sh" 2>&1)
 
-if echo "$INJECT_OUTPUT2" | grep -q "\[flashback\]"; then
+if echo "$INJECT_OUTPUT2" | grep -q "\[flashback"; then
   pass "Inject shows existing flashbacks on re-run"
 else
   fail "Inject did not show existing flashbacks"

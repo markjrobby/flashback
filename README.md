@@ -2,6 +2,8 @@
 
 **Visual memory for Claude Code sessions.**
 
+**Current version:** 0.2.0 (2025-01-08) - [Changelog](CHANGELOG.md)
+
 Flashback preserves old tool outputs as images before compaction loses them. When Claude's context gets summarized, you keep the full visual record.
 
 ## The Problem
@@ -70,12 +72,27 @@ rm -rf ~/flashback ~/.flashback
 
 **Storage:** `~/.flashback/{session_id}/`
 
+## Updates
+
+Flashback auto-updates by default. On each new session, it checks GitHub for the latest version and pulls automatically.
+
+To disable auto-updates:
+```bash
+export FLASHBACK_AUTO_UPDATE=false
+```
+
+To manually update:
+```
+/flashback:update
+```
+
 ## Configuration
 
 Environment variables (optional):
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `FLASHBACK_AUTO_UPDATE` | `true` | Auto-update on session start |
 | `FLASHBACK_MIN_CHARS` | `1000` | Min chars to capture |
 | `FLASHBACK_TURNS_THRESHOLD` | `5` | Turns before rendering to image |
 | `FLASHBACK_MAX_IMAGES` | `3` | Max images to render per prompt |
