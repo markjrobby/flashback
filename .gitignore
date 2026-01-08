@@ -1,0 +1,5 @@
+# Test artifacts
+tests/output/
+
+# macOS
+.DS_Store

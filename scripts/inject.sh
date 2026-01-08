@@ -1,13 +1,17 @@
 #!/bin/bash
 #
 # Flashback - Inject Hook
-# Renders old context as images before each prompt
+# Renders old context as images and shows available visual memory
 #
 
 # Configuration
 STORE_DIR="${FLASHBACK_STORE_DIR:-$HOME/.flashback}"
 TURNS_THRESHOLD="${FLASHBACK_TURNS_THRESHOLD:-5}"
 MAX_IMAGES="${FLASHBACK_MAX_IMAGES:-3}"
+
+# Colors
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
 
 # Read JSON from stdin to temp file (avoids shell escaping issues)
 TEMP_INPUT=$(mktemp)
@@ -39,19 +43,13 @@ if [ "$CURRENT_TURN" -eq 0 ]; then
   exit 0
 fi
 
-# Find old entries that need rendering
-RENDERED=()
+# Collect all available flashback images and render new ones
+AVAILABLE=()
 COUNT=0
 
 for JSON_FILE in $(ls -1t "$SESSION_DIR"/*.json 2>/dev/null); do
   if [ "$COUNT" -ge "$MAX_IMAGES" ]; then
     break
-  fi
-
-  # Check if already rendered
-  IMG_FILE="${JSON_FILE%.json}.png"
-  if [ -f "$IMG_FILE" ]; then
-    continue
   fi
 
   # Get turn number and check if old enough
@@ -68,10 +66,13 @@ console.log([e.turn || 0, e.context_hint || '', e.char_count || 0].join('\t'));
     continue
   fi
 
-  # Generate HTML
-  HTML_FILE="${JSON_FILE%.json}.html"
+  IMG_FILE="${JSON_FILE%.json}.png"
 
-  node -e "
+  # Render if not already rendered
+  if [ ! -f "$IMG_FILE" ]; then
+    HTML_FILE="${JSON_FILE%.json}.html"
+
+    node -e "
 const fs = require('fs');
 const entry = JSON.parse(fs.readFileSync('$JSON_FILE', 'utf8'));
 const content = entry.content || '';
@@ -121,26 +122,33 @@ pre {
 fs.writeFileSync('$HTML_FILE', html);
 "
 
-  # Convert to PNG using qlmanage
-  qlmanage -t -s 800 -o "$SESSION_DIR" "$HTML_FILE" >/dev/null 2>&1
+    # Convert to PNG using qlmanage
+    qlmanage -t -s 800 -o "$SESSION_DIR" "$HTML_FILE" >/dev/null 2>&1
 
-  # qlmanage adds .png to the filename
-  if [ -f "${HTML_FILE}.png" ]; then
-    mv "${HTML_FILE}.png" "$IMG_FILE"
-    rm -f "$HTML_FILE"
-    RENDERED+=("$HINT|$TURNS_AGO|$IMG_FILE")
+    # qlmanage adds .png to the filename
+    if [ -f "${HTML_FILE}.png" ]; then
+      mv "${HTML_FILE}.png" "$IMG_FILE"
+      rm -f "$HTML_FILE"
+    else
+      rm -f "$HTML_FILE"
+      continue
+    fi
+  fi
+
+  # Add to available list (whether newly rendered or existing)
+  if [ -f "$IMG_FILE" ]; then
+    # Use tab as delimiter since hints may contain |
+    AVAILABLE+=("${HINT}"$'\t'"${TURNS_AGO}"$'\t'"${IMG_FILE}")
     COUNT=$((COUNT + 1))
-  else
-    rm -f "$HTML_FILE"
   fi
 done
 
-# Output if we rendered anything
-if [ ${#RENDERED[@]} -gt 0 ]; then
-  echo "[flashback] Visual memory from earlier:"
-  for ITEM in "${RENDERED[@]}"; do
-    IFS='|' read -r HINT TURNS_AGO IMG_FILE <<< "$ITEM"
-    echo "  $HINT ($TURNS_AGO turns ago): $IMG_FILE"
+# Always show available flashback images in cyan
+if [ ${#AVAILABLE[@]} -gt 0 ]; then
+  echo -e "${CYAN}[flashback] Visual memory from earlier:${NC}"
+  for ITEM in "${AVAILABLE[@]}"; do
+    IFS=$'\t' read -r HINT TURNS_AGO IMG_FILE <<< "$ITEM"
+    echo -e "${CYAN}  $HINT ($TURNS_AGO turns ago): $IMG_FILE${NC}"
   done
 fi
 
