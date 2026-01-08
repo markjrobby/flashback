@@ -151,6 +151,20 @@ else
   fail "JSON structure is invalid"
 fi
 
+# Test 7: All slash commands exist
+echo ""
+echo "Test 7: Slash commands exist"
+COMMANDS_OK=true
+for CMD in install uninstall update version; do
+  if [ ! -f "$PROJECT_DIR/commands/$CMD.md" ]; then
+    fail "Missing command: $CMD.md"
+    COMMANDS_OK=false
+  fi
+done
+if [ "$COMMANDS_OK" = true ]; then
+  pass "All slash commands exist (install, uninstall, update, version)"
+fi
+
 # Summary
 echo ""
 echo "=============================="
