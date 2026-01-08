@@ -2,7 +2,7 @@
 
 **Visual memory for Claude Code sessions.**
 
-**Current version:** 0.2.1 (2025-01-08) - [Changelog](CHANGELOG.md)
+**Current version:** 0.2.2 (2025-01-08) - [Changelog](CHANGELOG.md)
 
 Flashback preserves old tool outputs as images before compaction loses them. When Claude's context gets summarized, you keep the full visual record.
 

@@ -77,12 +77,12 @@ process.stdin.on('end', () => {
         # Auto-update: pull latest
         cd "$PLUGIN_DIR" && git pull --quiet origin main 2>/dev/null
         if [ $? -eq 0 ]; then
-          echo -e "${GREEN}[flashback] Updated to v$REMOTE_VERSION${NC}"
+          echo "{\"systemMessage\":\"[flashback] Updated to v$REMOTE_VERSION\"}"
         else
-          echo -e "${YELLOW}[flashback v$LOCAL_VERSION] Update available: v$REMOTE_VERSION - run /flashback:update${NC}"
+          echo "{\"systemMessage\":\"[flashback v$LOCAL_VERSION] Update available: v$REMOTE_VERSION - run /flashback:update\"}"
         fi
       else
-        echo -e "${YELLOW}[flashback v$LOCAL_VERSION] Update available: v$REMOTE_VERSION - run /flashback:update${NC}"
+        echo "{\"systemMessage\":\"[flashback v$LOCAL_VERSION] Update available: v$REMOTE_VERSION - run /flashback:update\"}"
       fi
     fi
   fi
@@ -200,13 +200,27 @@ fs.writeFileSync('$HTML_FILE', html);
   fi
 done
 
-# Always show available flashback images in cyan
+# Output results as JSON for Claude Code
 if [ ${#AVAILABLE[@]} -gt 0 ]; then
-  echo -e "${CYAN}[flashback v$LOCAL_VERSION] Visual memory from earlier:${NC}"
+  # Build the context message for Claude (image paths)
+  CONTEXT="[flashback v$LOCAL_VERSION] Visual memory from earlier:"
   for ITEM in "${AVAILABLE[@]}"; do
     IFS=$'\t' read -r HINT TURNS_AGO IMG_FILE <<< "$ITEM"
-    echo -e "${CYAN}  $HINT ($TURNS_AGO turns ago): $IMG_FILE${NC}"
+    CONTEXT="$CONTEXT\n  $HINT ($TURNS_AGO turns ago): $IMG_FILE"
   done
+
+  # Build user notification (shorter summary)
+  USER_MSG="[flashback v$LOCAL_VERSION] ${#AVAILABLE[@]} visual memories available from earlier in this session"
+
+  # Output JSON with systemMessage for user and context for Claude
+  node -e "
+const context = $(echo -n "$CONTEXT" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>console.log(JSON.stringify(d)))");
+const userMsg = '$USER_MSG';
+console.log(JSON.stringify({
+  systemMessage: userMsg,
+  additionalContext: context
+}));
+"
 fi
 
 exit 0

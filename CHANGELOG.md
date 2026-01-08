@@ -2,6 +2,12 @@
 
 All notable changes to Flashback will be documented in this file.
 
+## [0.2.2] - 2025-01-08
+
+### Changed
+- Use JSON output with `systemMessage` for user-visible notifications
+- Notifications now properly display in Claude Code UI
+
 ## [0.2.1] - 2025-01-08
 
 ### Added
