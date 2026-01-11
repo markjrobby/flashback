@@ -2,6 +2,16 @@
 
 All notable changes to Flashback will be documented in this file.
 
+## [0.3.0] - 2025-01-11
+
+### Added
+- One-line install script: `curl -fsSL https://raw.githubusercontent.com/markjrobby/flashback/main/install.sh | bash`
+- Automatic hook configuration during install (no manual steps needed)
+
+### Changed
+- Installation now clones to `~/flashback` instead of requiring manual plugin setup
+- Simplified UX: install once, works in all sessions automatically
+
 ## [0.2.4] - 2025-01-08
 
 ### Changed

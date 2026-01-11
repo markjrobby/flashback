@@ -2,7 +2,7 @@
 
 **Visual memory for Claude Code sessions.**
 
-**Current version:** 0.2.4 (2025-01-08) - [Changelog](CHANGELOG.md)
+**Current version:** 0.3.0 (2025-01-11) - [Changelog](CHANGELOG.md)
 
 Flashback preserves old tool outputs as images before compaction loses them. When Claude's context gets summarized, you keep the full visual record.
 
@@ -27,38 +27,25 @@ Unlike text summarization, images preserve **everything literally**—just compr
 
 ## Installation
 
-**1. Clone the plugin:**
+**One command:**
 
 ```bash
-git clone https://github.com/markjrobby/flashback.git ~/flashback
+curl -fsSL https://raw.githubusercontent.com/markjrobby/flashback/main/install.sh | bash
 ```
 
-**2. Start Claude Code with the plugin and run the install command:**
+**Done!** Flashback is now active in all Claude Code sessions.
 
-```bash
-claude --plugin-dir ~/flashback
-```
-
-Then inside Claude Code:
-
-```
-/flashback:install
-```
-
-**Done!** Flashback is now active for all future Claude Code sessions.
+**Available commands:**
+- `/flashback-version` - Check current version
+- `/flashback-update` - Update to latest version
+- `/flashback-uninstall` - Remove flashback
 
 ## Uninstall
 
-Inside any Claude Code session with the plugin loaded:
+Inside any Claude Code session:
 
 ```
-/flashback:uninstall
-```
-
-Or manually remove the hooks from `~/.claude/settings.json` and delete:
-
-```bash
-rm -rf ~/flashback ~/.flashback
+/flashback-uninstall
 ```
 
 ## How It Works

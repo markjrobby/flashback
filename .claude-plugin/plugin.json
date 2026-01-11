@@ -1,7 +1,7 @@
 {
   "name": "flashback",
   "description": "Visual memory for Claude Code. Preserves old tool outputs as images so Claude can flash back to earlier context.",
-  "version": "0.2.4",
+  "version": "0.3.0",
   "author": {
     "name": "Mark Robert"
   },
