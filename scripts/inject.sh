@@ -14,12 +14,6 @@ TURNS_THRESHOLD="${FLASHBACK_TURNS_THRESHOLD:-5}"
 MAX_IMAGES="${FLASHBACK_MAX_IMAGES:-3}"
 AUTO_UPDATE="${FLASHBACK_AUTO_UPDATE:-true}"
 
-# Colors
-CYAN='\033[0;36m'
-YELLOW='\033[0;33m'
-GREEN='\033[0;32m'
-NC='\033[0m' # No Color
-
 # Get local version from plugin.json
 LOCAL_VERSION=$(node -e "
 const fs = require('fs');
@@ -49,6 +43,9 @@ SESSION_DIR="$STORE_DIR/$SESSION_ID"
 # Create session dir if it doesn't exist (for version check file)
 mkdir -p "$SESSION_DIR"
 
+# Track messages to output
+UPDATE_MSG=""
+
 # Version check - only once per session
 VERSION_CHECK_FILE="$SESSION_DIR/.version_checked"
 if [ ! -f "$VERSION_CHECK_FILE" ]; then
@@ -71,65 +68,59 @@ process.stdin.on('end', () => {
 " 2>/dev/null)
 
   if [ -n "$REMOTE_VERSION" ] && [ "$REMOTE_VERSION" != "$LOCAL_VERSION" ]; then
-    # Compare versions (simple string compare works for semver)
-    if [ "$(printf '%s\n' "$REMOTE_VERSION" "$LOCAL_VERSION" | sort -V | tail -n1)" = "$REMOTE_VERSION" ] && [ "$REMOTE_VERSION" != "$LOCAL_VERSION" ]; then
+    # Compare versions
+    if [ "$(printf '%s\n' "$REMOTE_VERSION" "$LOCAL_VERSION" | sort -V | tail -n1)" = "$REMOTE_VERSION" ]; then
       if [ "$AUTO_UPDATE" = "true" ]; then
         # Auto-update: pull latest
         cd "$PLUGIN_DIR" && git pull --quiet origin main 2>/dev/null
         if [ $? -eq 0 ]; then
-          echo "{\"systemMessage\":\"[flashback] Updated to v$REMOTE_VERSION\"}"
+          UPDATE_MSG="[flashback] Updated to v$REMOTE_VERSION"
+          # Re-read version after update
+          LOCAL_VERSION="$REMOTE_VERSION"
         else
-          echo "{\"systemMessage\":\"[flashback v$LOCAL_VERSION] Update available: v$REMOTE_VERSION - run /flashback:update\"}"
+          UPDATE_MSG="[flashback v$LOCAL_VERSION] Update available: v$REMOTE_VERSION - run /flashback:update"
         fi
       else
-        echo "{\"systemMessage\":\"[flashback v$LOCAL_VERSION] Update available: v$REMOTE_VERSION - run /flashback:update\"}"
+        UPDATE_MSG="[flashback v$LOCAL_VERSION] Update available: v$REMOTE_VERSION - run /flashback:update"
       fi
     fi
   fi
 fi
 
-# Check if we have any captured entries
-if [ ! -d "$SESSION_DIR" ]; then
-  exit 0
-fi
-
 # Count total entries (current turn)
 CURRENT_TURN=$(ls -1 "$SESSION_DIR"/*.json 2>/dev/null | wc -l | tr -d ' ')
-
-if [ "$CURRENT_TURN" -eq 0 ]; then
-  exit 0
-fi
 
 # Collect all available flashback images and render new ones
 AVAILABLE=()
 COUNT=0
 
-for JSON_FILE in $(ls -1t "$SESSION_DIR"/*.json 2>/dev/null); do
-  if [ "$COUNT" -ge "$MAX_IMAGES" ]; then
-    break
-  fi
+if [ "$CURRENT_TURN" -gt 0 ]; then
+  for JSON_FILE in $(ls -1t "$SESSION_DIR"/*.json 2>/dev/null); do
+    if [ "$COUNT" -ge "$MAX_IMAGES" ]; then
+      break
+    fi
 
-  # Get turn number and check if old enough
-  ENTRY_DATA=$(node -e "
+    # Get turn number and check if old enough
+    ENTRY_DATA=$(node -e "
 const fs = require('fs');
 const e = JSON.parse(fs.readFileSync('$JSON_FILE', 'utf8'));
 console.log([e.turn || 0, e.context_hint || '', e.char_count || 0].join('\t'));
 " 2>/dev/null)
 
-  IFS=$'\t' read -r ENTRY_TURN HINT CHAR_COUNT <<< "$ENTRY_DATA"
-  TURNS_AGO=$((CURRENT_TURN - ENTRY_TURN))
+    IFS=$'\t' read -r ENTRY_TURN HINT CHAR_COUNT <<< "$ENTRY_DATA"
+    TURNS_AGO=$((CURRENT_TURN - ENTRY_TURN))
 
-  if [ "$TURNS_AGO" -lt "$TURNS_THRESHOLD" ]; then
-    continue
-  fi
+    if [ "$TURNS_AGO" -lt "$TURNS_THRESHOLD" ]; then
+      continue
+    fi
 
-  IMG_FILE="${JSON_FILE%.json}.png"
+    IMG_FILE="${JSON_FILE%.json}.png"
 
-  # Render if not already rendered
-  if [ ! -f "$IMG_FILE" ]; then
-    HTML_FILE="${JSON_FILE%.json}.html"
+    # Render if not already rendered
+    if [ ! -f "$IMG_FILE" ]; then
+      HTML_FILE="${JSON_FILE%.json}.html"
 
-    node -e "
+      node -e "
 const fs = require('fs');
 const entry = JSON.parse(fs.readFileSync('$JSON_FILE', 'utf8'));
 const content = entry.content || '';
@@ -179,47 +170,58 @@ pre {
 fs.writeFileSync('$HTML_FILE', html);
 "
 
-    # Convert to PNG using qlmanage
-    qlmanage -t -s 800 -o "$SESSION_DIR" "$HTML_FILE" >/dev/null 2>&1
+      # Convert to PNG using qlmanage
+      qlmanage -t -s 800 -o "$SESSION_DIR" "$HTML_FILE" >/dev/null 2>&1
 
-    # qlmanage adds .png to the filename
-    if [ -f "${HTML_FILE}.png" ]; then
-      mv "${HTML_FILE}.png" "$IMG_FILE"
-      rm -f "$HTML_FILE"
-    else
-      rm -f "$HTML_FILE"
-      continue
+      # qlmanage adds .png to the filename
+      if [ -f "${HTML_FILE}.png" ]; then
+        mv "${HTML_FILE}.png" "$IMG_FILE"
+        rm -f "$HTML_FILE"
+      else
+        rm -f "$HTML_FILE"
+        continue
+      fi
     fi
-  fi
 
-  # Add to available list (whether newly rendered or existing)
-  if [ -f "$IMG_FILE" ]; then
-    # Use tab as delimiter since hints may contain |
-    AVAILABLE+=("${HINT}"$'\t'"${TURNS_AGO}"$'\t'"${IMG_FILE}")
-    COUNT=$((COUNT + 1))
-  fi
-done
+    # Add to available list (whether newly rendered or existing)
+    if [ -f "$IMG_FILE" ]; then
+      # Use tab as delimiter since hints may contain |
+      AVAILABLE+=("${HINT}"$'\t'"${TURNS_AGO}"$'\t'"${IMG_FILE}")
+      COUNT=$((COUNT + 1))
+    fi
+  done
+fi
 
 # Output results as JSON for Claude Code
-if [ ${#AVAILABLE[@]} -gt 0 ]; then
+# Always output if we have update message OR available flashbacks
+if [ -n "$UPDATE_MSG" ] || [ ${#AVAILABLE[@]} -gt 0 ]; then
   # Build the context message for Claude (image paths)
-  CONTEXT="[flashback v$LOCAL_VERSION] Visual memory from earlier:"
-  for ITEM in "${AVAILABLE[@]}"; do
-    IFS=$'\t' read -r HINT TURNS_AGO IMG_FILE <<< "$ITEM"
-    CONTEXT="$CONTEXT\n  $HINT ($TURNS_AGO turns ago): $IMG_FILE"
-  done
+  CONTEXT=""
+  USER_MSG=""
 
-  # Build user notification (shorter summary)
-  USER_MSG="[flashback v$LOCAL_VERSION] ${#AVAILABLE[@]} visual memories available from earlier in this session"
+  if [ ${#AVAILABLE[@]} -gt 0 ]; then
+    CONTEXT="[flashback v$LOCAL_VERSION] Visual memory from earlier:"
+    for ITEM in "${AVAILABLE[@]}"; do
+      IFS=$'\t' read -r HINT TURNS_AGO IMG_FILE <<< "$ITEM"
+      CONTEXT="$CONTEXT\n  $HINT ($TURNS_AGO turns ago): $IMG_FILE"
+    done
+    USER_MSG="[flashback v$LOCAL_VERSION] ${#AVAILABLE[@]} visual memories available from earlier in this session"
+  fi
+
+  # Combine update message with user message if both exist
+  if [ -n "$UPDATE_MSG" ] && [ -n "$USER_MSG" ]; then
+    USER_MSG="$UPDATE_MSG | $USER_MSG"
+  elif [ -n "$UPDATE_MSG" ]; then
+    USER_MSG="$UPDATE_MSG"
+  fi
 
   # Output JSON with systemMessage for user and context for Claude
   node -e "
-const context = $(echo -n "$CONTEXT" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>console.log(JSON.stringify(d)))");
+const context = '$CONTEXT';
 const userMsg = '$USER_MSG';
-console.log(JSON.stringify({
-  systemMessage: userMsg,
-  additionalContext: context
-}));
+const output = { systemMessage: userMsg };
+if (context) output.additionalContext = context;
+console.log(JSON.stringify(output));
 "
 fi
 

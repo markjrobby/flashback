@@ -2,6 +2,12 @@
 
 All notable changes to Flashback will be documented in this file.
 
+## [0.2.3] - 2025-01-08
+
+### Fixed
+- Auto-update notification now shows even when no captures exist yet
+- Restructured inject script to not exit early before outputting update messages
+
 ## [0.2.2] - 2025-01-08
 
 ### Changed
