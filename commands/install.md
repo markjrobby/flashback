@@ -1,4 +1,6 @@
-Install Flashback hooks into Claude Code user settings.
+Install Flashback hooks and commands into Claude Code user settings.
+
+**Step 1: Install hooks**
 
 Read the file ~/.claude/settings.json (create it if it doesn't exist with empty JSON {}).
 
@@ -13,7 +15,7 @@ Add the following hooks to the settings, merging with any existing hooks:
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/capture.sh",
+            "command": "~/flashback/scripts/capture.sh",
             "timeout": 10
           }
         ]
@@ -25,7 +27,7 @@ Add the following hooks to the settings, merging with any existing hooks:
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/inject.sh",
+            "command": "~/flashback/scripts/inject.sh",
             "timeout": 30
           }
         ]
@@ -37,4 +39,18 @@ Add the following hooks to the settings, merging with any existing hooks:
 
 Write the updated settings back to ~/.claude/settings.json.
 
-Confirm to the user that Flashback has been installed and will be active in all future Claude Code sessions.
+**Step 2: Install slash commands**
+
+Create the directory ~/.claude/commands/ if it doesn't exist.
+
+Copy the following command files from ~/flashback/commands/ to ~/.claude/commands/:
+- Copy `~/flashback/commands/version.md` to `~/.claude/commands/flashback-version.md`
+- Copy `~/flashback/commands/update.md` to `~/.claude/commands/flashback-update.md`
+- Copy `~/flashback/commands/uninstall.md` to `~/.claude/commands/flashback-uninstall.md`
+
+**Step 3: Confirm**
+
+Tell the user:
+- Flashback has been installed
+- Hooks are active in all future Claude Code sessions
+- Available commands: /flashback-version, /flashback-update, /flashback-uninstall

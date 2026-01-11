@@ -2,6 +2,13 @@
 
 All notable changes to Flashback will be documented in this file.
 
+## [0.2.4] - 2025-01-08
+
+### Changed
+- `/flashback:install` now also installs slash commands to `~/.claude/commands/`
+- Slash commands renamed: `/flashback-version`, `/flashback-update`, `/flashback-uninstall`
+- Commands now work in all sessions without needing `--plugin-dir`
+
 ## [0.2.3] - 2025-01-08
 
 ### Fixed
